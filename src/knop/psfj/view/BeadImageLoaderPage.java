@@ -50,6 +50,7 @@ import org.swixml.SwingEngine;
 import org.swixml.XVBox;
 
 import com.jgoodies.forms.layout.CellConstraints;
+import com.jgoodies.forms.layout.FormLayout;
 
 // TODO: Auto-generated Javadoc
 /**
@@ -187,7 +188,7 @@ public class BeadImageLoaderPage extends WizardPage {
 				"Click on <b>Add Image Stack</b> or <b>drag-and-drop your image stack</b> in this windows.<br>"
 				+ "<b>E.g.</b> : .tif, single-color files, 8 or 16-bits grayscale)<br>"
 				+"<br>For <b>single-color analysis</b>, add one or multiple image stacks from different fields of view.<br>"
-				+ "For <b>dual-color analysis</b>, add two image stacks corresponding to each channel from the same field of view."
+				+ "For <b>multi-channel analysis</b>, add 2 to 12 image stacks from the same field of view."
 				);
 
 		labelListModel.setManager(getBeadImageManager());
@@ -291,12 +292,15 @@ public class BeadImageLoaderPage extends WizardPage {
 			return false;
 		
 		boolean isDualColor = getBeadImageManager().isDualColorAnalysis();
-		try { 
-		if(isDualColor &&
-				(getBeadImageManager().getMicroscope(0).getWaveLength() == 0.0
-				|| getBeadImageManager().getMicroscope(1).getWaveLength() == 0.0)) {
-			return false;
-		}
+		try {
+			if (isDualColor) {
+				for (int channel = 0;
+						channel < getBeadImageManager().countBeadImage(); channel++) {
+					if (getBeadImageManager().getMicroscope(channel)
+							.getWaveLength() == 0.0)
+						return false;
+				}
+			}
 		}catch(Exception e) {
 			return false;
 		}
@@ -362,18 +366,25 @@ public class BeadImageLoaderPage extends WizardPage {
 	 * Update the wavelength list
 	 */
 	public void updateWaveLengthList() {
-		if (isSingleMode())
-			return;
 		wavelengthListContainer.removeAll();
+		if (isSingleMode()) {
+			wavelengthListContainer.revalidate();
+			wavelengthListContainer.repaint();
+			return;
+		}
+
+		int channelCount = getBeadImageManager().countBeadImage();
+		StringBuilder rows = new StringBuilder("p");
+		for (int i = 1; i < channelCount; i++)
+			rows.append(",3dlu,p");
+		wavelengthListContainer.setLayout(new FormLayout(
+				"left:pref,3dlu,pref,3dlu,left:pref", rows.toString()));
 
 		int row = 1;
 		CellConstraints c = new CellConstraints();
 
 		for (BeadImage image : getBeadImageManager().getBeadImageList()) {
 			// wavelengthListContainer.add(new JLabel(image.getImageName()));
-			if (row > 3)
-				break;
-			
 			JLabel label = new JLabel(image.getImageName(), image.getIcon(16),
 					JLabel.LEADING);
 			wavelengthListContainer.add(label, c.xy(1, row));
@@ -406,7 +417,8 @@ public class BeadImageLoaderPage extends WizardPage {
 			row += 2;
 
 		}
-		
+		wavelengthListContainer.revalidate();
+		wavelengthListContainer.repaint();
 	}
 
 	/**
@@ -504,6 +516,7 @@ public class BeadImageLoaderPage extends WizardPage {
 						BeadImageManager.DUAL_CHANNEL);
 			}
 			getBeadImageManager().checkForWarnings();
+			updateWaveLengthList();
 			updateModeView();
 
 		}

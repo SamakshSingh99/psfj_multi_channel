@@ -37,11 +37,11 @@
 			<label constraints="1,1,1,1" text="Specify the analysis type :                            " font="Arial-BOLD-14"  />
 			<buttongroup  id="modeRadioGroup" border="EmptyBorder(10,10,10,30)" >
 				<radiobutton constraints="1,3,1,1" id="singleChannelRadio"  text="Single-color analysis  : cumulative analysis of all beads of all files" actionCommand="single channel" action="onModeChanged" /> 
-				<radiobutton constraints="1,5,1,1" id="dualChannelRadio" text="Dual-color analysis : images from different wavelengths are compared" actionCommand="dual channel" action="onModeChanged" />
+				<radiobutton constraints="1,5,1,1" id="dualChannelRadio" text="Multi-channel analysis : channel 1 is compared with channels 2-12" actionCommand="dual channel" action="onModeChanged" />
 			</buttongroup>
 			
 			
-			<label constraints="1,7,5,1" text="Provide center emission wavelengths for the two color-channels : " id="wavelengthLabel"/>
+			<label constraints="1,7,5,1" text="Provide the center emission wavelength for every channel:" id="wavelengthLabel"/>
 			
 			<panel id="wavelengthListContainer"  constraints="1,9,1,1" >
 					<layout type="FormLayout" columns="left:pref,3dlu,pref,3dlu,left:pref" rows="p,3dlu,p,3dlu" />
