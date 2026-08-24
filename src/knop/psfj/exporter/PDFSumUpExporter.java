@@ -190,20 +190,25 @@ public class PDFSumUpExporter {
 				}
 				manager.setProgress("Generating ...", 70);
 
-				currentDocument.add(rs.bigTitle("Channel Comparaison"));
-				currentDocument.add(rs.title("Summary"));
-				currentDocument.add(rs.paragraph(String.format(
-						"%s pairs used for statistics.", manager.getPairedBeads()))); // MathUtils.formatDouble(manager.getDistanceThreshold(),manager.getMicroscope(0).getUnit()),)));
-
-				addGraphics(currentDocument, manager, 220,
-						PSFj.getHeatmapName(PSFj.CHR_SHIFT_XY, -1));
-				addGraphics(currentDocument, manager, 220,
-						PSFj.getHeatmapName(PSFj.CHR_SHIFT_XYZ, -1));
-				currentDocument.newPage();
-
-				for (int axe : PSFj.AXES)
-					addGraphics(currentDocument, manager, 225,
-							PSFj.getHeatmapName(PSFj.CHR_SHIFT_KEY, axe, -1));
+				for (int target = 1; target < manager.countBeadImage(); target++) {
+					currentDocument.add(rs.bigTitle("Chromatic comparison: channel 1 vs channel "
+							+ (target + 1)));
+					currentDocument.add(rs.title("Summary"));
+					currentDocument.add(rs.paragraph(String.format(
+							"%s pairs used for statistics.",
+							manager.getPairedBeads(target))));
+					addGraphics(currentDocument, manager, 220,
+							PSFj.getChromaticHeatmapName(PSFj.CHR_SHIFT_XY, target));
+					addGraphics(currentDocument, manager, 220,
+							PSFj.getChromaticHeatmapName(PSFj.CHR_SHIFT_XYZ, target));
+					currentDocument.newPage();
+					for (int axe : PSFj.AXES)
+						addGraphics(currentDocument, manager, 225,
+								PSFj.getChromaticHeatmapName(
+										PSFj.CHR_SHIFT_KEY, axe, target));
+					if (target < manager.countBeadImage() - 1)
+						currentDocument.newPage();
+				}
 
 				addGraphics(currentDocument, manager, 220, PSFj.BEAD_MONTAGE_KEY);
 			}

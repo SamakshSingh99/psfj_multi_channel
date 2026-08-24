@@ -153,21 +153,31 @@ public class HeatMapTable extends JPanel {
 		
 		
 		else {
-			
-			addBox("chr","Chromatic shifts","");
-			addBox("channel0",manager.getBeadImage(0).getMicroscope().getWaveLengthAsString(),"");
-			addBox("channel0_bis","","");
-			addBox("channel1",manager.getBeadImage(1).getMicroscope().getWaveLengthAsString(),"");
-			addBox("channel1_bis","","");
-			
-			
-			
-			addGraphs("channel0","fwhmX_0","fwhmY_0","fwhmZ_0");
-			addGraphs("channel0_bis","z_profile_0","asymmetry_0","theta_0");
-			addGraphs("channel1","fwhmX_1","fwhmY_1","fwhmZ_1");
-			addGraphs("channel1_bis","z_profile_1","asymmetry_1","theta_1");
-			
-			addGraphs("chr","deltaD","delta3D","deltaZ");
+			for (int channel = 0; channel < manager.countBeadImage(); channel++) {
+				String resolutionBox = "channel" + channel;
+				String otherBox = resolutionBox + "_other";
+				addBox(resolutionBox, "Channel " + (channel + 1) + " - "
+						+ manager.getBeadImage(channel).getMicroscope()
+								.getWaveLengthAsString(), "");
+				addBox(otherBox, "", "");
+				addGraphs(resolutionBox, "fwhmX_" + channel,
+						"fwhmY_" + channel, "fwhmZ_" + channel);
+				addGraphs(otherBox, "z_profile_" + channel,
+						"asymmetry_" + channel, "theta_" + channel);
+			}
+
+			for (int target = 1; target < manager.countBeadImage(); target++) {
+				String box = "chr_" + target;
+				addBox(box, "Chromatic shifts: channel 1 vs channel "
+						+ (target + 1), manager.getPairedBeads(target)
+						+ " bead pairs");
+				addGraphs(box,
+						PSFj.getChromaticHeatmapName(PSFj.CHR_SHIFT_XY, target),
+						PSFj.getChromaticHeatmapName(PSFj.CHR_SHIFT_XYZ, target),
+						PSFj.getChromaticHeatmapName(PSFj.CHR_SHIFT_KEY, 0, target),
+						PSFj.getChromaticHeatmapName(PSFj.CHR_SHIFT_KEY, 1, target),
+						PSFj.getChromaticHeatmapName(PSFj.CHR_SHIFT_KEY, 2, target));
+			}
 			
 		}
 		

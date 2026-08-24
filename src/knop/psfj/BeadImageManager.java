@@ -1277,26 +1277,29 @@ public class BeadImageManager extends Observable implements Observer {
 						.getDataSet(true, true);
 				String pairSuffix = image.getImageNameWithoutExtension() + "_vs_"
 						+ getBeadImage(comparisonChannel).getImageNameWithoutExtension();
-				String keySuffix = comparisonChannel == 1 ? ""
-						: "_ch" + (comparisonChannel + 1);
+				String pairTitle = "Channel 1 (" + image.getImageName()
+						+ ") vs channel " + (comparisonChannel + 1) + " ("
+						+ getBeadImage(comparisonChannel).getImageName() + ")";
 
 				DistanceHeatMap distanceHeatMap = new DistanceHeatMap(comparisonData,
 						image, PSFj.getColumnID(PSFj.CHR_SHIFT_XY,
 								PSFj.NOT_NORMALIZED), m.getXYTheoreticalResolution());
 				distanceHeatMap.setManager(this);
 				distanceHeatMap.setSaveSuffix(pairSuffix);
+				distanceHeatMap.setTitle("Lateral chromatic distance - " + pairTitle);
 				graphList.add(distanceHeatMap);
-				graphHash.put(PSFj.getHeatmapName(PSFj.CHR_SHIFT_XY, -1)
-						+ keySuffix, distanceHeatMap);
+				graphHash.put(PSFj.getChromaticHeatmapName(PSFj.CHR_SHIFT_XY,
+						comparisonChannel), distanceHeatMap);
 
 				DistanceHeatMap distanceHeatMap3d = new DistanceHeatMap(comparisonData,
 						image, PSFj.getColumnID(PSFj.CHR_SHIFT_XYZ,
 								PSFj.NOT_NORMALIZED), m.getZTheoreticalResolution());
 				distanceHeatMap3d.setManager(this);
 				distanceHeatMap3d.setSaveSuffix(pairSuffix);
+				distanceHeatMap3d.setTitle("3D chromatic distance - " + pairTitle);
 				graphList.add(distanceHeatMap3d);
-				graphHash.put(PSFj.getHeatmapName(PSFj.CHR_SHIFT_XYZ, -1)
-						+ keySuffix, distanceHeatMap3d);
+				graphHash.put(PSFj.getChromaticHeatmapName(PSFj.CHR_SHIFT_XYZ,
+						comparisonChannel), distanceHeatMap3d);
 
 				for (int axe : PSFj.AXES) {
 					String columnName = PSFj.getColumnID(PSFj.CHR_SHIFT_KEY, axe,
@@ -1305,9 +1308,11 @@ public class BeadImageManager extends Observable implements Observer {
 							image, columnName, m.getTheoreticalResolution(axe));
 					shiftHeatmap.setManager(this);
 					shiftHeatmap.setSaveSuffix(pairSuffix);
+					shiftHeatmap.setTitle(PSFj.CHR_SHIFT_KEY[axe] + " - "
+							+ pairTitle);
 					graphList.add(shiftHeatmap);
-					graphHash.put(PSFj.getHeatmapName(PSFj.CHR_SHIFT_KEY,
-							axe, comparisonChannel) + keySuffix, shiftHeatmap);
+					graphHash.put(PSFj.getChromaticHeatmapName(
+							PSFj.CHR_SHIFT_KEY, axe, comparisonChannel), shiftHeatmap);
 				}
 			}
 
@@ -1482,6 +1487,11 @@ public class BeadImageManager extends Observable implements Observer {
 
 		for (int channel = 1; channel < getBeadImageCount(); channel++) {
 			BeadImage target = getBeadImage(channel);
+			for (BeadFrame bead : reference.getBeadFrameList())
+				bead.resetChannelPartner(channel);
+			for (BeadFrame bead : target.getBeadFrameList())
+				bead.resetChannelPartner(0);
+
 			BeadFrameList referenceBeads = reference.getBeadFrameList()
 					.getOnlyValidBeads();
 			BeadFrameList targetBeads = target.getBeadFrameList()
@@ -2110,6 +2120,11 @@ public class BeadImageManager extends Observable implements Observer {
 	 */
 	public int getPairedBeads() {
 		return getBeadImage(0).getBeadFrameList().getPairedCount();
+	}
+
+	public int getPairedBeads(int targetChannel) {
+		return getBeadImage(0).getBeadFrameList()
+				.getWithChannelPartner(targetChannel).size();
 	}
 
 	/**

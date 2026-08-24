@@ -171,6 +171,18 @@ public class PSFj {
 		if(channel < 0) return column;
 		else return column + "_"+channel;
 	}
+
+	/** Stable graph key for channel 1 versus a zero-based target channel. */
+	public static String getChromaticHeatmapName(String metric,
+			int targetChannel) {
+		return targetChannel == 1 ? metric : metric + "_ch"
+				+ (targetChannel + 1);
+	}
+
+	public static String getChromaticHeatmapName(String[] metrics, int axis,
+			int targetChannel) {
+		return getChromaticHeatmapName(metrics[axis], targetChannel);
+	}
 	
 	/**
 	 * Gets the column id.
