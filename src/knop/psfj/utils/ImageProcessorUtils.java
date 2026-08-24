@@ -29,7 +29,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 import javax.imageio.ImageIO;
-import javax.xml.bind.DatatypeConverter;
+import java.util.Base64;
 
 // TODO: Auto-generated Javadoc
 /**
@@ -128,7 +128,7 @@ public class ImageProcessorUtils {
           ByteArrayOutputStream stream = new ByteArrayOutputStream();
           ImageIO.write(ip.getBufferedImage(), "png", stream);
 
-          String encodedImage = DatatypeConverter.printBase64Binary(stream.toByteArray());
+          String encodedImage = Base64.getEncoder().encodeToString(stream.toByteArray());
 
           return encodedImage;
 

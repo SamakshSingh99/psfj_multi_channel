@@ -34,6 +34,8 @@ import ij.process.LUT;
 import java.awt.Color;
 import java.awt.Rectangle;
 import java.awt.geom.Rectangle2D;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Observable;
 
 import knop.psfj.resolution.Counter3D;
@@ -176,6 +178,12 @@ public class BeadFrame extends Observable {
 
 	/**  The alter ego (corresponding bead in an other channel). */
 	BeadFrame alterEgo;
+
+	/** Corresponding beads and shifts, keyed by zero-based channel index. */
+	Map<Integer, BeadFrame> channelPartners = new HashMap<Integer, BeadFrame>();
+	Map<Integer, Double> channelDeltaX = new HashMap<Integer, Double>();
+	Map<Integer, Double> channelDeltaY = new HashMap<Integer, Double>();
+	Map<Integer, Double> channelDeltaZ = new HashMap<Integer, Double>();
 
 	public static final String MSG_PSF_FOUND = "psf found";
 	
@@ -1502,6 +1510,11 @@ public class BeadFrame extends Observable {
 		return deltaX;
 	}
 
+	public double getDeltaX(int channel) {
+		Double value = channelDeltaX.get(channel);
+		return value == null ? Double.NaN : value;
+	}
+
 	/**
 	 * Sets the delta x.
 	 * 
@@ -1519,6 +1532,11 @@ public class BeadFrame extends Observable {
 	 */
 	public double getDeltaY() {
 		return deltaY;
+	}
+
+	public double getDeltaY(int channel) {
+		Double value = channelDeltaY.get(channel);
+		return value == null ? Double.NaN : value;
 	}
 
 	/**
@@ -1540,6 +1558,11 @@ public class BeadFrame extends Observable {
 		return deltaZ;
 	}
 
+	public double getDeltaZ(int channel) {
+		Double value = channelDeltaZ.get(channel);
+		return value == null ? Double.NaN : value;
+	}
+
 	/**
 	 * Sets the delta z.
 	 * 
@@ -1559,6 +1582,10 @@ public class BeadFrame extends Observable {
 		return alterEgo;
 	}
 
+	public BeadFrame getChannelPartner(int channel) {
+		return channelPartners.get(channel);
+	}
+
 	/**
 	 * Gets the z profile.
 	 * 
@@ -1573,6 +1600,13 @@ public class BeadFrame extends Observable {
 	 */
 	public void resetAlterEgo() {
 		alterEgo = null;
+	}
+
+	public void resetChannelPartner(int channel) {
+		channelPartners.remove(channel);
+		channelDeltaX.remove(channel);
+		channelDeltaY.remove(channel);
+		channelDeltaZ.remove(channel);
 	}
 
 	/**
@@ -1596,6 +1630,29 @@ public class BeadFrame extends Observable {
 		deltaZ = alterEgo.getZProfile() - getZProfile();// getZProfile()-alterEgo.getZProfile();
 
 		this.alterEgo = alterEgo;
+	}
+
+	/** Associates this bead with the corresponding bead in a channel. */
+	public void setChannelPartner(int channel, BeadFrame partner) {
+		if (partner == null)
+			return;
+
+		double dx = (partner.getCentroidXInImage() - getCentroidXInImage())
+				* getCalibration().pixelWidth;
+		double dy = (partner.getCentroidYInImage() - getCentroidYInImage())
+				* getCalibration().pixelHeight;
+		double dz = partner.getZProfile() - getZProfile();
+
+		channelPartners.put(channel, partner);
+		channelDeltaX.put(channel, dx);
+		channelDeltaY.put(channel, dy);
+		channelDeltaZ.put(channel, dz);
+
+		// Preserve the legacy two-channel API for existing reports and views.
+		alterEgo = partner;
+		deltaX = dx;
+		deltaY = dy;
+		deltaZ = dz;
 	}
 
 	/**

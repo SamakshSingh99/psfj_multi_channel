@@ -356,9 +356,10 @@ public class BeadImageManager extends Observable implements Observer {
 			}
 
 			// checking the channel number
-			if (numChannel > 2) {
+			if (numChannel > BeadImage.MAX_CHANNELS) {
 				if (reason == null)
-					reason = "Only monochannel image can be added.";
+					reason = "A maximum of " + BeadImage.MAX_CHANNELS
+						+ " channels is supported.";
 				isValid = false;
 			}
 
@@ -764,6 +765,9 @@ public class BeadImageManager extends Observable implements Observer {
 				
 				BeadImage image = (BeadImage) message.getData();
 				add(image);
+				if (countBeadImage() >= 2
+						&& countBeadImage() <= BeadImage.MAX_CHANNELS)
+					setAnalysisType(DUAL_CHANNEL);
 				return;
 
 			}
@@ -1256,48 +1260,65 @@ public class BeadImageManager extends Observable implements Observer {
 			}
 
 			
-			FovDataSet dataSet = getBeadImage(0).getBeadFrameList()
-					.getWithAlterEgo().getDataSet(true, true);
 			BeadImage image = getBeadImage(0);
 			Microscope m = image.getMicroscope();
 
-			// Creating the chromatic shift heatmap ( use only x,y shift for
-			// distance calculation )
-			DistanceHeatMap distanceHeatMap = new DistanceHeatMap(dataSet,
-					getBeadImage(0), PSFj.getColumnID(PSFj.CHR_SHIFT_XY,
-							PSFj.NOT_NORMALIZED),
-					m.getXYTheoreticalResolution());
-			distanceHeatMap.setManager(this);
-			// Creating the chromatic shift heatmap that use x,y,z shifts
-			DistanceHeatMap distanceHeatMap3d = new DistanceHeatMap(dataSet,
-					image, PSFj.getColumnID(PSFj.CHR_SHIFT_XYZ,
-							PSFj.NOT_NORMALIZED), m.getZTheoreticalResolution());
-			distanceHeatMap3d.setManager(this);
-			// adding them to list and hash
-			graphList.add(distanceHeatMap);
-			graphHash.put(PSFj.getHeatmapName(PSFj.CHR_SHIFT_XY, -1),
-					distanceHeatMap);
+			for (int comparisonChannel = 1;
+					comparisonChannel < getBeadImageCount(); comparisonChannel++) {
+				for (BeadFrame bead : image.getBeadFrameList()) {
+					bead.resetAlterEgo();
+					BeadFrame partner = bead.getChannelPartner(comparisonChannel);
+					if (partner != null)
+						bead.setAlterEgo(partner);
+				}
 
-			graphList.add(distanceHeatMap3d);
-			graphHash.put(PSFj.getHeatmapName(PSFj.CHR_SHIFT_XYZ, -1),
-					distanceHeatMap3d);
-			setProgress(progressText, 80);
-			// Taking of shift heatmaps (x, y, z)
-			for (int axe : PSFj.AXES) {
+				FovDataSet comparisonData = image.getBeadFrameList()
+						.getWithChannelPartner(comparisonChannel)
+						.getDataSet(true, true);
+				String pairSuffix = image.getImageNameWithoutExtension() + "_vs_"
+						+ getBeadImage(comparisonChannel).getImageNameWithoutExtension();
+				String keySuffix = comparisonChannel == 1 ? ""
+						: "_ch" + (comparisonChannel + 1);
 
-				String columnName = PSFj.getColumnID(PSFj.CHR_SHIFT_KEY, axe,
-						PSFj.NOT_NORMALIZED, 0);
-				String heatmapName = PSFj.getHeatmapName(PSFj.CHR_SHIFT_KEY,
-						axe, channelId);
+				DistanceHeatMap distanceHeatMap = new DistanceHeatMap(comparisonData,
+						image, PSFj.getColumnID(PSFj.CHR_SHIFT_XY,
+								PSFj.NOT_NORMALIZED), m.getXYTheoreticalResolution());
+				distanceHeatMap.setManager(this);
+				distanceHeatMap.setSaveSuffix(pairSuffix);
+				graphList.add(distanceHeatMap);
+				graphHash.put(PSFj.getHeatmapName(PSFj.CHR_SHIFT_XY, -1)
+						+ keySuffix, distanceHeatMap);
 
-				ShiftHeatMap shiftHeatmap = new ShiftHeatMap(dataSet, image,
-						columnName, m.getTheoreticalResolution(axe));
+				DistanceHeatMap distanceHeatMap3d = new DistanceHeatMap(comparisonData,
+						image, PSFj.getColumnID(PSFj.CHR_SHIFT_XYZ,
+								PSFj.NOT_NORMALIZED), m.getZTheoreticalResolution());
+				distanceHeatMap3d.setManager(this);
+				distanceHeatMap3d.setSaveSuffix(pairSuffix);
+				graphList.add(distanceHeatMap3d);
+				graphHash.put(PSFj.getHeatmapName(PSFj.CHR_SHIFT_XYZ, -1)
+						+ keySuffix, distanceHeatMap3d);
 
-				shiftHeatmap.setManager(this);
-
-				graphList.add(shiftHeatmap);
-				graphHash.put(heatmapName, shiftHeatmap);
+				for (int axe : PSFj.AXES) {
+					String columnName = PSFj.getColumnID(PSFj.CHR_SHIFT_KEY, axe,
+							PSFj.NOT_NORMALIZED, 0);
+					ShiftHeatMap shiftHeatmap = new ShiftHeatMap(comparisonData,
+							image, columnName, m.getTheoreticalResolution(axe));
+					shiftHeatmap.setManager(this);
+					shiftHeatmap.setSaveSuffix(pairSuffix);
+					graphList.add(shiftHeatmap);
+					graphHash.put(PSFj.getHeatmapName(PSFj.CHR_SHIFT_KEY,
+							axe, comparisonChannel) + keySuffix, shiftHeatmap);
+				}
 			}
+
+			// Restore the original dual-channel view to channel 2.
+			for (BeadFrame bead : image.getBeadFrameList()) {
+				bead.resetAlterEgo();
+				BeadFrame partner = bead.getChannelPartner(1);
+				if (partner != null)
+					bead.setAlterEgo(partner);
+			}
+			setProgress(progressText, 80);
 			BeadMontage montage = new BeadMontage(this);
 			graphList.add(montage);
 			graphHash.put(PSFj.BEAD_MONTAGE_KEY, montage);
@@ -1449,143 +1470,73 @@ public class BeadImageManager extends Observable implements Observer {
 	 * Compares the data sets in case of dual color analysis
 	 */
 	public void compareDataSets() {
-		
-		// merge first data set if really it's not a dual color analysis but this case shouldn't happen
 		System.out.println("Data Set List : " + getBeadImageCount());
-		if (getBeadImageCount() != 2) {
+		if (getBeadImageCount() < 2) {
 			mergeDataSets();
 			return;
 		}
-		
-		
-		//getting two bead images
-		BeadImage image1 = getBeadImage(0);
-		BeadImage image2 = getBeadImage(1);
-		
-		// stats
-		DescriptiveStatistics deltaDstats = new DescriptiveStatistics();
 
-		BeadFrame closestBead;
-		BeadFrame competitor;
-		
-		
-		double distance;
-		double competitorDistance;
-
+		BeadImage reference = getBeadImage(0);
 		dataSet = new FovDataSet();
+		double threshold = getDistanceThreshold();
 
-		int max = image1.getBeadFrameList().getValidBeadFrameCount();
-		int count = 0;
+		for (int channel = 1; channel < getBeadImageCount(); channel++) {
+			BeadImage target = getBeadImage(channel);
+			BeadFrameList referenceBeads = reference.getBeadFrameList()
+					.getOnlyValidBeads();
+			BeadFrameList targetBeads = target.getBeadFrameList()
+					.getOnlyValidBeads();
 
-		// Pairing beads with their nearest neighbour in the other channel
-		for (BeadFrame bead : image1.getBeadFrameList().getOnlyValidBeads()) {
-
-			if (count % 10 == 0) {
-				setProgress("Comparing beads...", count * 100 / max);
-			}
-			count++;
-			
-			// getting the closest bead in the other channel
-			closestBead = bead.getClosestBead(image2.getBeadFrameList()
-					.getOnlyValidBeads());
-			
-			// if the closest doesn't exists (thresholdwise)
-			if (closestBead == null) {
-				continue;
-			}
-		
-			else {
-				// getting the distance
-				distance = bead.getDistance(closestBead);
-				
-				if (closestBead.getAlterEgo() != null) {
-					// if a bead has already been assigned the closest bead, it's a competitor.
-					// Let's see which one is the closest.
-					competitor = closestBead.getAlterEgo();
-					
-					// distances
-					distance = bead.getDistance(closestBead);
-					competitorDistance = closestBead.getDistance(competitor);
-					
-					// if the distance is less than the competitor, then this bead is the best match for the corresponding one
-					if (distance < competitorDistance) {
-						// System.out.println("* Competitor : OUT !!");
-						
-						// they are associated
-						bead.setAlterEgo(closestBead);
-						closestBead.setAlterEgo(bead);
-						
-						// the competitor is out
-						competitor.resetAlterEgo();
-						
-						// and we explain to him why :-)
-						competitor
-								.setInvalidityReason("A closer corresponding bead exists : n°"
-										+ bead.getId());
-						deltaDstats.addValue(distance);
-					}
-					// if not, the competor wins and the current beads is left out.
-					else {
-						bead.resetAlterEgo();
-						bead.setInvalidityReason("A closer corresponding bead exists : n°"
-								+ competitor.getId());
-					}
-
-				}
-				// if no competitor, then it's perfect
-				else {
-					bead.setAlterEgo(closestBead);
-					closestBead.setAlterEgo(bead);
-					deltaDstats.addValue(bead.getDistance(closestBead));
-				}
-			}
-		}
-		
-		
-		// forgot what it is
-		double deltaD;
-
-		// deleting beads too far away from their corresponding beads
-		double threshold = getDistanceThreshold();// deltaDmedian
-													// +
-													// deltaDstdDev;
-		count = 0;
-		
-		max = image1.getValidBeadCount();
-		
-		
-		// for each bead that has a alter ego (corresponding bead in the other channel)
-		for (BeadFrame bead : image1.getBeadFrameList().getOnlyValidBeads()
-				.getWithAlterEgo()) {
-
-			String reason = "";
-			// the distance between those beads
-			deltaD = bead.getDistance(bead.getAlterEgo());
-			
-			//if this distance is greater than the threshold, the bead is burned out
-			if (deltaD > threshold) {
-				reason = String
-						.format("Corresponding bead too far away : %.3f µm (limit : %.3f µm)",
-								deltaD, threshold);
-
-				bead.getAlterEgo().setInvalidityReason(reason);
-				bead.getAlterEgo().resetAlterEgo();
-				bead.setInvalidityReason(reason);
-				// bead.setValid(false,reason);
+			// alterEgo is retained as a temporary one-pair workspace so the
+			// original nearest-neighbour conflict resolution remains compatible.
+			for (BeadFrame bead : referenceBeads)
 				bead.resetAlterEgo();
-			}
-			
-			// refreshing some progress bar
-			count++;
-			if (count % 10 == 0) {
-				setProgress("Comparing beads...", count * 100 / max);
+			for (BeadFrame bead : targetBeads)
+				bead.resetAlterEgo();
+
+			int count = 0;
+			for (BeadFrame bead : referenceBeads) {
+				setProgress("Comparing channel 1 with channel " + (channel + 1)
+						+ "...", count++ * 100 / Math.max(1, referenceBeads.size()));
+				BeadFrame closest = bead.getClosestBead(targetBeads);
+				if (closest == null)
+					continue;
+
+				BeadFrame competitor = closest.getAlterEgo();
+				if (competitor != null
+						&& closest.getDistance(competitor) <= bead.getDistance(closest))
+					continue;
+				if (competitor != null)
+					competitor.resetAlterEgo();
+
+				bead.setAlterEgo(closest);
+				closest.setAlterEgo(bead);
 			}
 
+			for (BeadFrame bead : referenceBeads.getWithAlterEgo()) {
+				BeadFrame partner = bead.getAlterEgo();
+				if (bead.getDistance(partner) > threshold) {
+					partner.resetAlterEgo();
+					bead.resetAlterEgo();
+					continue;
+				}
+				bead.setChannelPartner(channel, partner);
+				partner.setChannelPartner(0, bead);
+			}
+
+			dataSet.mergeDataSet(referenceBeads.getWithChannelPartner(channel)
+					.getDataSet(), true);
 		}
-		
-		// just adding those information to the main data set (but is not really used)
-		dataSet.mergeDataSet(image1.getBeadFrameList().getWithAlterEgo()
-				.getDataSet());
+
+		// Keep the original API pointed at channel 2 for legacy views/exporters.
+		for (BeadFrame bead : reference.getBeadFrameList()) {
+			bead.resetAlterEgo();
+			BeadFrame partner = bead.getChannelPartner(1);
+			if (partner != null) {
+				bead.setAlterEgo(partner);
+				partner.setAlterEgo(bead);
+			}
+		}
 
 	}
 

@@ -66,6 +66,9 @@ import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
  */
 public class BeadImage extends Observable {
 
+    /** Maximum number of spectral channels supported in one input file. */
+    public static final int MAX_CHANNELS = 12;
+
     /**
      * The file address.
      */
@@ -616,8 +619,9 @@ public class BeadImage extends Observable {
         int numChannel = ipr.getSizeC();
         int bitsPerPixel = ipr.getBitsPerPixel();
 
-        if (numChannel > 2) {
-            notifyObservers("error", "Only monochannel image can be added.", null, null);
+        if (numChannel > MAX_CHANNELS) {
+            notifyObservers("error", "A maximum of " + MAX_CHANNELS
+                    + " channels is supported.", null, null);
             isValid = false;
             return;
         }
@@ -675,66 +679,65 @@ public class BeadImage extends Observable {
                 double min;
                 double max;
 
-                // if a second channel in the image is detected
-                boolean isSecondChannel = false;
-                BeadImage secondChannel = null;
-                ImageStack secondStack = null;
+                if (numChannel > MAX_CHANNELS) {
+                    throw new FormatException("A maximum of " + MAX_CHANNELS
+                            + " channels is supported.");
+                }
 
-                if (numChannel == 2) {
+                BeadImage[] channelImages = new BeadImage[numChannel];
+                ImageStack[] channelStacks = new ImageStack[numChannel];
+                channelImages[0] = this;
+                channelStacks[0] = new ImageStack(width, height);
+                stack = channelStacks[0];
 
-                    secondChannel = new BeadImage();
-                    secondChannel.setFileAddress(fileAddress);
-                    secondChannel.setImageName(secondChannel.getImageName()
-                            + "_channel_2");
-                    secondStack = new ImageStack(width, height);
-                    isSecondChannel = true;
-                    secondChannel.setStack(secondStack);
-
+                for (int c = 1; c < numChannel; c++) {
+                    BeadImage channelImage = new BeadImage();
+                    channelImage.setFileAddress(fileAddress);
+                    channelImage.setImageName(getImageNameWithoutExtension()
+                            + "_channel_" + (c + 1));
+                    channelStacks[c] = new ImageStack(width, height);
+                    channelImage.setStack(channelStacks[c]);
+                    channelImages[c] = channelImage;
                     notifyObservers(MSG_NEW_CHANNEL_DETECTED,
-                            "Two channels detected", null, secondChannel);
-
+                            "Channel " + (c + 1) + " detected", null,
+                            channelImage);
                 }
 
-                stack = new ImageStack(width, height);
+                int loaded = 0;
+                for (int t = 0; t < ipr.getSizeT(); t++) {
+                    for (int z = 0; z < ipr.getSizeZ(); z++) {
+                        for (int c = 0; c < numChannel; c++) {
+                            int planeIndex = ipr.getIndex(z, c, t);
+                            ImageProcessor ip = ipr.openProcessors(planeIndex)[0];
+                            channelStacks[c].addSlice(ip);
+                            channelImages[c].setStatus("Loading plane "
+                                    + (++loaded) + "/" + num + "...");
+                            channelImages[c].setProgress(loaded, num);
 
-                for (int i = 0; i != num; i++) {
-                    setProgress(i, num);
-                    setStatus("Loading slice " + (i + 1) + "/" + num + "...");
+                            if (c != 0)
+                                continue;
 
-                    ImageProcessor ip = ipr.openProcessors(i)[0];
+                            min = ip.getMin();
+                            max = ip.getMax();
 
-                    if (isSecondChannel) {
-                        i++;
-                        ImageProcessor ip2 = ipr.openProcessors(i)[0];
-                        secondStack.addSlice(ip2);
-                        secondChannel.setStatus("Loading slice " + (i + 1) + "/"
-                                + num + "...");
-                        secondChannel.setProgress(i, num);
+                            if (min < minIntentisyOfWholeStack)
+                                minIntentisyOfWholeStack = min;
+                            if (max > maxIntensityOfWholeStack)
+                                maxIntensityOfWholeStack = max;
+
+                            stdDev = ip.getStatistics().stdDev;
+
+                            if (standardDeviations.getMax() < stdDev)
+                                beadFocusPlane = z;
+                            standardDeviations.addValue(stdDev);
+                            updateView(ip);
+                        }
                     }
-
-                    min = ip.getMin();
-                    max = ip.getMax();
-
-                    if (min < minIntentisyOfWholeStack) {
-                        minIntentisyOfWholeStack = min;
-                    }
-                    if (max > maxIntensityOfWholeStack) {
-                        maxIntensityOfWholeStack = max;
-                    }
-
-                    stdDev = ip.getStatistics().stdDev;
-
-                    if (standardDeviations.getMax() < stdDev) {
-                        beadFocusPlane = i;
-                    }
-                    standardDeviations.addValue(stdDev);
-                    stack.addSlice(ip);
-                    updateView(ip);
                 }
-                if (isSecondChannel) {
-                    autoFocus();
-                    secondChannel.autoFocus();
-                    secondChannel.setProgress(100);
+
+                for (int c = 0; c < numChannel; c++) {
+                    channelImages[c].autoFocus();
+                    channelImages[c].setProgress(100);
                 }
                 try {
                     ipr.close();

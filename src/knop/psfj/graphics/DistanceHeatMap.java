@@ -45,6 +45,7 @@ public class DistanceHeatMap extends FullHeatMap {
 
 	/** The manager. */
 	BeadImageManager manager;
+	String saveSuffix;
 
 	/**
 	 * Instantiates a new distance heat map.
@@ -69,6 +70,10 @@ public class DistanceHeatMap extends FullHeatMap {
 	 */
 	public void setManager(BeadImageManager manager) {
 		this.manager = manager;
+	}
+
+	public void setSaveSuffix(String saveSuffix) {
+		this.saveSuffix = saveSuffix;
 	}
 
 	/**
@@ -179,7 +184,9 @@ public class DistanceHeatMap extends FullHeatMap {
 	public String getSaveId() {
 
 		String suffix;
-		if (manager == null)
+		if (saveSuffix != null)
+			suffix = saveSuffix;
+		else if (manager == null)
 			suffix = image.getImageNameWithoutExtension();
 		else
 			suffix = manager.getBeadImage(0).getImageNameWithoutExtension() + "_"

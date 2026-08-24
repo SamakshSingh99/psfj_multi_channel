@@ -94,6 +94,16 @@ public class BeadFrameList extends ArrayList<BeadFrame> {
 		return list;
 	}
 
+	/** Returns beads paired with a specific zero-based channel. */
+	public BeadFrameList getWithChannelPartner(int channel) {
+		BeadFrameList list = new BeadFrameList();
+		for (BeadFrame frame : this) {
+			if (frame.getChannelPartner(channel) != null)
+				list.add(frame);
+		}
+		return list;
+	}
+
 	/**
 	 * Return a FovDataSet of the beads containd inside the list. if
 	 * excludeNonValid is true, only valid beads will be included in the data

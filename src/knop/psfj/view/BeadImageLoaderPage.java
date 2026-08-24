@@ -418,7 +418,8 @@ public class BeadImageLoaderPage extends WizardPage {
 		BeadImageManager m = getBeadImageManager();
 		
 		boolean isSingleColor = !m.isDualColorAnalysis();
-		boolean moreThanTwo = m.countBeadImage() > 2;
+		boolean validMultiChannelCount = m.countBeadImage() >= 2
+				&& m.countBeadImage() <= BeadImage.MAX_CHANNELS;
 		boolean atLeastTwo = m.countBeadImage() >=2;
 		
 		singleChannelRadio.setSelected(isSingleColor);
@@ -432,7 +433,7 @@ public class BeadImageLoaderPage extends WizardPage {
 		
 	
 		
-		dualChannelRadio.setEnabled(!moreThanTwo);
+		dualChannelRadio.setEnabled(validMultiChannelCount);
 		
 	}
 

@@ -199,58 +199,29 @@ public class CsvExporter {
 						roi.height, roi.x, roi.y);
 			
 			
-			//Filtering data
-			manager.setProgress(status, progress+=10);
-			String path1 = path
-					+ manager.getBeadImage(0).getImageNameWithoutExtension()
-					+ roiExtension + "_data.csv";
-			String path2 = path
-					+ manager.getBeadImage(1).getImageNameWithoutExtension()
-					+ roiExtension + "_data.csv";
-			
-			
-			FovDataSet dataSet1 = manager.getBeadImage(0).getBeadFrameList()
-					.getFromROI(roi).getDataSet(false, true);
-			
-			manager.setProgress(status, progress+=10);
-			dataSet1.recalculateZProfileNormalisation(manager.getZProfileMean(0));
-			
-			manager.setProgress(status, progress+=10);
-			FovDataSet dataSet2 = manager.getBeadImage(1).getBeadFrameList()
-					.getFromROI(roi).getDataSet(false, true);
-			
-			manager.setProgress(status, progress+=10);
-			dataSet2.recalculateZProfileNormalisation(manager.getZProfileMean(1));
-			
-			manager.setProgress(status, progress+=10);
-			renameColumnName(dataSet1);
-			renameColumnName(dataSet2);
+			for (int channel = 0; channel < manager.countBeadImage(); channel++) {
+				BeadImage image = manager.getBeadImage(channel);
+				FovDataSet channelData = image.getBeadFrameList()
+						.getFromROI(roi).getDataSet(false, true);
+				channelData.recalculateZProfileNormalisation(
+						manager.getZProfileMean(channel));
+				renameColumnName(channelData);
+				addBeadImageInfos(channelData, channel);
+				addHeatMapInfos(channelData);
+				String channelPath = path + image.getImageNameWithoutExtension()
+						+ roiExtension + "_data.csv";
+				TextUtils.writeStringToFile(channelPath,
+						channelData.exportToString(monocolorColumns), false);
+			}
 
-			String path3 = path
-					+ manager.getBeadImage(0).getImageNameWithoutExtension() + "_"
-					+ manager.getBeadImage(1).getImageNameWithoutExtension()
-					+ roiExtension + "_comparaison.csv";
-			manager.setProgress(status, progress+=10);
-			addBeadImageInfos(dataSet1, 0);
-			addBeadImageInfos(dataSet2, 1);
-
-			manager.setProgress(status, progress+=10);
-			addHeatMapInfos(dataSet1);
-			addHeatMapInfos(dataSet2);
-
-			String csv1 = dataSet1.exportToString(monocolorColumns);
-			String csv2 = dataSet2.exportToString(monocolorColumns);
-			String csv3 = getCompareDataSet(roi);
-
-			manager.setProgress(status, progress+=10);
-			TextUtils.writeStringToFile(path1, csv1, false);
-			TextUtils.writeStringToFile(path2, csv2, false);
-			TextUtils.writeStringToFile(path3, csv3, false);
-
-			if (openAfter) {
-				FileUtils.openFolder(path1);
-				FileUtils.openFolder(path2);
-				FileUtils.openFolder(path3);
+			for (int channel = 1; channel < manager.countBeadImage(); channel++) {
+				String comparisonPath = path
+						+ manager.getBeadImage(0).getImageNameWithoutExtension()
+						+ "_vs_"
+						+ manager.getBeadImage(channel).getImageNameWithoutExtension()
+						+ roiExtension + "_comparison.csv";
+				TextUtils.writeStringToFile(comparisonPath,
+						getCompareDataSet(roi, channel), false);
 			}
 		}
 
@@ -267,15 +238,20 @@ public class CsvExporter {
 	 * @return the compare data set
 	 */
 	public String getCompareDataSet(Rectangle roi) {
+		return getCompareDataSet(roi, 1);
+	}
+
+	/** Returns channel 1 versus the requested zero-based channel. */
+	public String getCompareDataSet(Rectangle roi, int channel) {
 
 		String wavelength1 = manager.getBeadImage(0).getMicroscope()
 				.getWaveLengthAsString();
-		String wavelength2 = manager.getBeadImage(1).getMicroscope()
+		String wavelength2 = manager.getBeadImage(channel).getMicroscope()
 				.getWaveLengthAsString();
 		String unit = manager.getMicroscope(0).getUnit();
 		BeadFrameList list = manager.getBeadImage(0).getBeadFrameList()
-				.getFromROI(roi).getWithAlterEgo();
-		return getCompareDataSet(list, wavelength1, wavelength2, unit);
+				.getFromROI(roi).getWithChannelPartner(channel);
+		return getCompareDataSet(list, wavelength1, wavelength2, unit, channel);
 
 	}
 	
@@ -290,6 +266,11 @@ public class CsvExporter {
 	 */
 	public String getCompareDataSet(BeadFrameList list, String wavelength1,
 			String wavelength2, String unit) {
+		return getCompareDataSet(list, wavelength1, wavelength2, unit, 1);
+	}
+
+	public String getCompareDataSet(BeadFrameList list, String wavelength1,
+			String wavelength2, String unit, int channel) {
 		FovDataSet resultData = new FovDataSet();
 
 		String BEAD_1 = "Bead Id ch 1";
@@ -314,29 +295,29 @@ public class CsvExporter {
 
 		for (BeadFrame frame : list) {
 
-			BeadFrame alterEgo = frame.getAlterEgo();
+			BeadFrame alterEgo = frame.getChannelPartner(channel);
 
 			resultData.addValue(BEAD_1, frame.getId());
 			resultData.addValue(BEAD_2, alterEgo.getId());
 
 			resultData.addValue(X0_1, frame.getFovX());
 			resultData.addValue(X0_2, alterEgo.getFovX());
-			resultData.addValue(DX, frame.getDeltaX());
+			resultData.addValue(DX, frame.getDeltaX(channel));
 
 			resultData.addValue(Y0_1, frame.getFovY());
 			resultData.addValue(Y0_2, alterEgo.getFovY());
-			resultData.addValue(DY, frame.getDeltaY());
+			resultData.addValue(DY, frame.getDeltaY(channel));
 
 			resultData.addValue(Z0_1, frame.getZProfile());
 			resultData.addValue(Z0_2, alterEgo.getZProfile());
-			resultData.addValue(DZ, frame.getDeltaZ());
+			resultData.addValue(DZ, frame.getDeltaZ(channel));
 		}
 
 		resultData.setMetaDataValue("Channel 1", manager.getBeadImage(0)
 				.getImageName());
 		resultData.setMetaDataValue("Wavelength (channel 1)", wavelength1);
 
-		resultData.setMetaDataValue("Channel 2", manager.getBeadImage(1)
+		resultData.setMetaDataValue("Channel 2", manager.getBeadImage(channel)
 				.getImageName());
 		resultData.setMetaDataValue("Wavelength (channel 2)", wavelength2);
 

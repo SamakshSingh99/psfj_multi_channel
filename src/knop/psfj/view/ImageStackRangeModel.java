@@ -33,7 +33,6 @@ import knop.psfj.utils.MathUtils;
 
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 
-import com.sun.org.apache.bcel.internal.generic.GETSTATIC;
 
 import prefuse.util.ui.JRangeSlider;
 
