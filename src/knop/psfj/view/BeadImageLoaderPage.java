@@ -266,7 +266,9 @@ public class BeadImageLoaderPage extends WizardPage {
 			updateModeView();
 			updateItems();
 			System.out.println(message);
-			if(message.getName().contains("analysis type") ) updateWaveLengthList();
+			if (message.getName().contains("analysis type")
+					|| message.getName().contains("beadimage list modified"))
+				updateWaveLengthList();
 			updateModeView();
 		}
 	}

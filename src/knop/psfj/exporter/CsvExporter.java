@@ -38,11 +38,20 @@ import knop.psfj.resolution.Microscope;
 import knop.psfj.utils.FileUtils;
 import knop.psfj.utils.TextUtils;
 
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+
 // TODO: Auto-generated Javadoc
 /**
  * The Class CsvExporter.
  */
 public class CsvExporter {
+
+	private static final String DELTA_X = "delta x0";
+	private static final String DELTA_Y = "delta y0";
+	private static final String DELTA_Z = "delta z0";
+	private static final String DELTA_XY = "delta XY";
+	private static final String DELTA_XYZ = "delta XYZ";
+	private static final double[] SUMMARY_PERCENTILES = new double[]{5, 25, 75, 95};
 
 	/** The manager. */
 	BeadImageManager manager;
@@ -215,14 +224,18 @@ public class CsvExporter {
 			}
 
 			for (int channel = 1; channel < manager.countBeadImage(); channel++) {
-				String comparisonPath = path
-						+ manager.getBeadImage(0).getImageNameWithoutExtension()
-						+ "_vs_"
-						+ manager.getBeadImage(channel).getImageNameWithoutExtension()
+				String comparisonPath = path + getPairFileStem(channel)
 						+ roiExtension + "_comparison.csv";
 				TextUtils.writeStringToFile(comparisonPath,
 						getCompareDataSet(roi, channel), false);
 			}
+
+			String summaryPath = path + "channel_1_"
+					+ sanitizeFileName(manager.getBeadImage(0)
+							.getImageNameWithoutExtension())
+					+ roiExtension + "_chromatic_shift_summary.csv";
+			TextUtils.writeStringToFile(summaryPath,
+					getChromaticShiftSummary(roi), false);
 		}
 
 		if (openAfter) {
@@ -272,26 +285,25 @@ public class CsvExporter {
 	public String getCompareDataSet(BeadFrameList list, String wavelength1,
 			String wavelength2, String unit, int channel) {
 		FovDataSet resultData = new FovDataSet();
+		int targetChannelNumber = channel + 1;
 
 		String BEAD_1 = "Bead Id ch 1";
-		String BEAD_2 = "Bead Id ch 2";
+		String BEAD_2 = "Bead Id ch " + targetChannelNumber;
 
 		String X0_1 = "x0 ch 1";
-		String X0_2 = "x0 ch 2";
-		String DX = "delta x0";
+		String X0_2 = "x0 ch " + targetChannelNumber;
 
 		String Y0_1 = "y0 ch 1";
-		String Y0_2 = "y0 ch 2";
-		String DY = "delta y0";
+		String Y0_2 = "y0 ch " + targetChannelNumber;
 
 		String Z0_1 = "z0 ch 1";
-		String Z0_2 = "z0 ch 2";
-		String DZ = "delta z0";
+		String Z0_2 = "z0 ch " + targetChannelNumber;
 
-		resultData.addColumn(BEAD_1, BEAD_2, X0_1, X0_2, DX, Y0_1, Y0_2, DY,
-				Z0_1, Z0_2, DZ);
-		resultData.setColumnsUnits(unit, X0_1, X0_2, DX, Y0_1, Y0_2, DY, Z0_1,
-				Z0_2, DZ);
+		resultData.addColumn(BEAD_1, BEAD_2, X0_1, X0_2, DELTA_X,
+				Y0_1, Y0_2, DELTA_Y, Z0_1, Z0_2, DELTA_Z, DELTA_XY,
+				DELTA_XYZ);
+		resultData.setColumnsUnits(unit, X0_1, X0_2, DELTA_X, Y0_1, Y0_2,
+				DELTA_Y, Z0_1, Z0_2, DELTA_Z, DELTA_XY, DELTA_XYZ);
 
 		for (BeadFrame frame : list) {
 
@@ -302,32 +314,136 @@ public class CsvExporter {
 
 			resultData.addValue(X0_1, frame.getFovX());
 			resultData.addValue(X0_2, alterEgo.getFovX());
-			resultData.addValue(DX, frame.getDeltaX(channel));
+			double deltaX = frame.getDeltaX(channel);
+			resultData.addValue(DELTA_X, deltaX);
 
 			resultData.addValue(Y0_1, frame.getFovY());
 			resultData.addValue(Y0_2, alterEgo.getFovY());
-			resultData.addValue(DY, frame.getDeltaY(channel));
+			double deltaY = frame.getDeltaY(channel);
+			resultData.addValue(DELTA_Y, deltaY);
 
 			resultData.addValue(Z0_1, frame.getZProfile());
 			resultData.addValue(Z0_2, alterEgo.getZProfile());
-			resultData.addValue(DZ, frame.getDeltaZ(channel));
+			double deltaZ = frame.getDeltaZ(channel);
+			resultData.addValue(DELTA_Z, deltaZ);
+			resultData.addValue(DELTA_XY, calculateDeltaXY(deltaX, deltaY));
+			resultData.addValue(DELTA_XYZ,
+					calculateDeltaXYZ(deltaX, deltaY, deltaZ));
 		}
 
 		resultData.setMetaDataValue("Channel 1", manager.getBeadImage(0)
 				.getImageName());
 		resultData.setMetaDataValue("Wavelength (channel 1)", wavelength1);
 
-		resultData.setMetaDataValue("Channel 2", manager.getBeadImage(channel)
+		resultData.setMetaDataValue("Channel " + targetChannelNumber,
+				manager.getBeadImage(channel)
 				.getImageName());
-		resultData.setMetaDataValue("Wavelength (channel 2)", wavelength2);
+		resultData.setMetaDataValue("Wavelength (channel " + targetChannelNumber
+				+ ")", wavelength2);
 
 		resultData.setMetaDataValue("Note",
-				"delta values = channel 2 - channel 1");
+				"signed delta values = channel " + targetChannelNumber
+						+ " - channel 1; distance columns are non-negative");
 		resultData.setMetaDataValue("  ",
 				"For x and y coordinates : the origin is the center of the image.");
 
 		return resultData.exportToString();
 
+	}
+
+	public static double calculateDeltaXY(double deltaX, double deltaY) {
+		return Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+	}
+
+	public static double calculateDeltaXYZ(double deltaX, double deltaY,
+			double deltaZ) {
+		return Math.sqrt(deltaX * deltaX + deltaY * deltaY
+				+ deltaZ * deltaZ);
+	}
+
+	/** Returns one summary row for every channel 1 versus target comparison. */
+	public String getChromaticShiftSummary(Rectangle roi) {
+		FovDataSet summary = new FovDataSet();
+		String[] identityColumns = new String[]{"reference channel",
+				"reference image", "target channel", "target image",
+				"reference wavelength", "target wavelength", "matched bead pairs"};
+		summary.addColumn(identityColumns);
+
+		for (String metric : new String[]{DELTA_X, DELTA_Y, DELTA_Z,
+				DELTA_XY, DELTA_XYZ}) {
+			addSummaryColumns(summary, metric);
+		}
+
+		BeadImage reference = manager.getBeadImage(0);
+		for (int channel = 1; channel < manager.countBeadImage(); channel++) {
+			BeadImage target = manager.getBeadImage(channel);
+			BeadFrameList pairs = reference.getBeadFrameList().getFromROI(roi)
+					.getWithChannelPartner(channel);
+			DescriptiveStatistics deltaX = new DescriptiveStatistics();
+			DescriptiveStatistics deltaY = new DescriptiveStatistics();
+			DescriptiveStatistics deltaZ = new DescriptiveStatistics();
+			DescriptiveStatistics deltaXY = new DescriptiveStatistics();
+			DescriptiveStatistics deltaXYZ = new DescriptiveStatistics();
+
+			for (BeadFrame frame : pairs) {
+				double dx = frame.getDeltaX(channel);
+				double dy = frame.getDeltaY(channel);
+				double dz = frame.getDeltaZ(channel);
+				deltaX.addValue(dx);
+				deltaY.addValue(dy);
+				deltaZ.addValue(dz);
+				deltaXY.addValue(calculateDeltaXY(dx, dy));
+				deltaXYZ.addValue(calculateDeltaXYZ(dx, dy, dz));
+			}
+
+			summary.addValue(identityColumns[0], 1.0);
+			summary.addValue(identityColumns[1], reference.getImageName());
+			summary.addValue(identityColumns[2], channel + 1.0);
+			summary.addValue(identityColumns[3], target.getImageName());
+			summary.addValue(identityColumns[4], reference.getMicroscope()
+					.getWaveLengthAsString());
+			summary.addValue(identityColumns[5], target.getMicroscope()
+					.getWaveLengthAsString());
+			summary.addValue(identityColumns[6], (double) pairs.size());
+			addSummaryValues(summary, DELTA_X, deltaX);
+			addSummaryValues(summary, DELTA_Y, deltaY);
+			addSummaryValues(summary, DELTA_Z, deltaZ);
+			addSummaryValues(summary, DELTA_XY, deltaXY);
+			addSummaryValues(summary, DELTA_XYZ, deltaXYZ);
+		}
+		return summary.exportToString();
+	}
+
+	private static void addSummaryColumns(FovDataSet summary, String metric) {
+		summary.addColumn(metric + " mean", metric + " median",
+				metric + " standard deviation", metric + " minimum",
+				metric + " maximum");
+		for (double percentile : SUMMARY_PERCENTILES)
+			summary.addColumn(metric + " p" + (int) percentile);
+	}
+
+	private static void addSummaryValues(FovDataSet summary, String metric,
+			DescriptiveStatistics statistics) {
+		summary.addValue(metric + " mean", statistics.getMean());
+		summary.addValue(metric + " median", statistics.getPercentile(50));
+		summary.addValue(metric + " standard deviation",
+				statistics.getStandardDeviation());
+		summary.addValue(metric + " minimum", statistics.getMin());
+		summary.addValue(metric + " maximum", statistics.getMax());
+		for (double percentile : SUMMARY_PERCENTILES)
+			summary.addValue(metric + " p" + (int) percentile,
+					statistics.getPercentile(percentile));
+	}
+
+	private String getPairFileStem(int targetChannel) {
+		return "channel_1_" + sanitizeFileName(manager.getBeadImage(0)
+				.getImageNameWithoutExtension()) + "_vs_channel_"
+				+ (targetChannel + 1) + "_" + sanitizeFileName(manager
+						.getBeadImage(targetChannel).getImageNameWithoutExtension());
+	}
+
+	private static String sanitizeFileName(String name) {
+		return name.replaceAll("[^A-Za-z0-9._-]", "_");
 	}
 
 	/**
