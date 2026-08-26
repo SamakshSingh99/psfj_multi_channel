@@ -145,7 +145,8 @@ public class HeatMapTable extends JPanel {
 			addGraphs("other",
 					PSFj.getHeatmapName(PSFj.Z_PROFILE, -1),
 					PSFj.getHeatmapName(PSFj.ASYMMETRY_KEY, -1),
-					PSFj.getHeatmapName(PSFj.THETA_KEY, -1)
+					PSFj.getHeatmapName(PSFj.THETA_KEY, -1),
+					PSFj.getHeatmapName(PSFj.CORRECTED_INTENSITY, -1)
 					);
 			
 			
@@ -163,7 +164,8 @@ public class HeatMapTable extends JPanel {
 				addGraphs(resolutionBox, "fwhmX_" + channel,
 						"fwhmY_" + channel, "fwhmZ_" + channel);
 				addGraphs(otherBox, "z_profile_" + channel,
-						"asymmetry_" + channel, "theta_" + channel);
+						"asymmetry_" + channel, "theta_" + channel,
+						PSFj.getHeatmapName(PSFj.CORRECTED_INTENSITY, channel));
 			}
 
 			for (int target = 1; target < manager.countBeadImage(); target++) {

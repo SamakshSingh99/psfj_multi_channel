@@ -201,6 +201,20 @@ public class BeadFrameList extends ArrayList<BeadFrame> {
 		
                 dataSet.addColumn(PSFj.FITTED_BRIGHTNESS).setName(PSFj.FITTED_BRIGHTNESS);
                 dataSet.addColumn(PSFj.FITTED_BACKGROUND).setName(PSFj.FITTED_BACKGROUND);
+		dataSet.addColumn(PSFj.CORRECTED_INTENSITY).setUnit("AU")
+				.setName("Background-corrected bead intensity");
+		dataSet.addColumn(PSFj.NORMALIZED_INTENSITY)
+				.setName("Bead intensity / channel median");
+
+		DescriptiveStatistics intensityStatistics = new DescriptiveStatistics();
+		for (BeadFrame bead : this) {
+			if (!bead.isValid())
+				continue;
+			double intensity = getCorrectedIntensity(bead);
+			if (!Double.isNaN(intensity) && !Double.isInfinite(intensity))
+				intensityStatistics.addValue(intensity);
+		}
+		double medianIntensity = intensityStatistics.getPercentile(50);
                 
 		axeStrings = new String[] { "x","y","z" };
 		String[] axeNormsValue = new String[] { "XY","XY","Z" };
@@ -299,6 +313,11 @@ public class BeadFrameList extends ArrayList<BeadFrame> {
                         
                         dataSet.addValue(PSFj.FITTED_BRIGHTNESS,bead.getFittingParameter(BeadFrame.X, BeadFrame.A));
                         dataSet.addValue(PSFj.FITTED_BACKGROUND,bead.getFittingParameter(BeadFrame.X, BeadFrame.B));
+			double correctedIntensity = getCorrectedIntensity(bead);
+			dataSet.addValue(PSFj.CORRECTED_INTENSITY, correctedIntensity);
+			dataSet.addValue(PSFj.NORMALIZED_INTENSITY,
+					medianIntensity > 0.0 ? correctedIntensity / medianIntensity
+							: Double.NaN);
                         
 			if(bead instanceof BeadFrame2D) {
 			BeadFrame2D bead2d = (BeadFrame2D) bead;
@@ -371,6 +390,19 @@ public class BeadFrameList extends ArrayList<BeadFrame> {
 
 		
 		return dataSet;
+	}
+
+	/**
+	 * Returns the fitted signal above background. The 2D fit stores A as an
+	 * already background-separated amplitude; legacy 1D fits store peak and
+	 * background separately.
+	 */
+	public static double getCorrectedIntensity(BeadFrame bead) {
+		double brightness = bead.getFittingParameter(BeadFrame.X, BeadFrame.A);
+		if (bead instanceof BeadFrame2D)
+			return Math.max(0.0, brightness);
+		double background = bead.getFittingParameter(BeadFrame.X, BeadFrame.B);
+		return Math.max(0.0, brightness - background);
 	}
 	
 	/*

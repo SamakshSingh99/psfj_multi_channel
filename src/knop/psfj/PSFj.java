@@ -107,6 +107,12 @@ public class PSFj {
         
         /** Fitted background */
         public final static String FITTED_BACKGROUND = "Fitted background(B)";
+
+	/** Background-corrected fitted bead signal in arbitrary intensity units. */
+	public final static String CORRECTED_INTENSITY = "corrected intensity";
+
+	/** Corrected intensity divided by the median for the current channel. */
+	public final static String NORMALIZED_INTENSITY = "normalized intensity";
         
 	/** The Constant NORMALIZED. */
 	public static final int NORMALIZED = 1;

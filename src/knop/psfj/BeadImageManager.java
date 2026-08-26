@@ -29,6 +29,7 @@ import knop.psfj.graphics.BeadMontage;
 import knop.psfj.graphics.DistanceHeatMap;
 import knop.psfj.graphics.FWHMHeatMap;
 import knop.psfj.graphics.FullHeatMap;
+import knop.psfj.graphics.IntensityHeatMap;
 import knop.psfj.graphics.PsfJGraph;
 import knop.psfj.graphics.ShiftHeatMap;
 import knop.psfj.graphics.ThetaHeatMap;
@@ -1256,6 +1257,13 @@ public class BeadImageManager extends Observable implements Observer {
 				graphList.add(asymetryMap);
 				graphList.add(thetaMap);
 
+				IntensityHeatMap intensityMap = new IntensityHeatMap(dataSet, image);
+				intensityMap.setTitle("Intensity uniformity of "
+						+ image.getImageName());
+				graphList.add(intensityMap);
+				graphHash.put(PSFj.getHeatmapName(PSFj.CORRECTED_INTENSITY,
+						channelId), intensityMap);
+
 				channelId++;
 			}
 
@@ -1377,6 +1385,13 @@ public class BeadImageManager extends Observable implements Observer {
 
 			graphList.add(asymetryMap);
 			graphList.add(thetaMap);
+
+			IntensityHeatMap intensityMap = new IntensityHeatMap(dataSet,
+					getBeadImage(0));
+			intensityMap.setTitle("Intensity uniformity");
+			graphList.add(intensityMap);
+			graphHash.put(PSFj.getHeatmapName(PSFj.CORRECTED_INTENSITY, -1),
+					intensityMap);
 			setProgress(progressText, progress += 15);
 		}
 

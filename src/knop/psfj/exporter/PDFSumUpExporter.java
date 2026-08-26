@@ -154,6 +154,8 @@ public class PDFSumUpExporter {
 						PSFj.getHeatmapName(PSFj.ASYMMETRY_KEY, -1));
 				addGraphics(currentDocument, manager, 220,
 						PSFj.getHeatmapName(PSFj.THETA_KEY, -1));
+				addGraphics(currentDocument, manager, 220,
+						PSFj.getHeatmapName(PSFj.CORRECTED_INTENSITY, -1));
 
 			} else {
 
@@ -183,6 +185,9 @@ public class PDFSumUpExporter {
 							PSFj.getHeatmapName(PSFj.ASYMMETRY_KEY, channel));
 					addGraphics(currentDocument, manager, 220,
 							PSFj.getHeatmapName(PSFj.THETA_KEY, channel));
+					addGraphics(currentDocument, manager, 220,
+							PSFj.getHeatmapName(PSFj.CORRECTED_INTENSITY,
+									channel));
 
 					currentDocument.newPage();
 

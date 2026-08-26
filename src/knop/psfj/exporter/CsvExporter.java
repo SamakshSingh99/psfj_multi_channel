@@ -97,6 +97,8 @@ public class CsvExporter {
                                         ,PSFj.CENTROID_BRIGHTNESS_KEY
                                         ,PSFj.FITTED_BRIGHTNESS
                                         ,PSFj.FITTED_BACKGROUND
+						,PSFj.CORRECTED_INTENSITY
+						,PSFj.NORMALIZED_INTENSITY
                                 }));
 
 		dualColorColumns = new ArrayList<String>(monocolorColumns);
@@ -196,6 +198,8 @@ public class CsvExporter {
 			renameColumnName(dataSet);
 			TextUtils.writeStringToFile(path,
 					dataSet.exportToString(columns), false);
+			TextUtils.writeStringToFile(getSidecarPath(path,
+					"_intensity_summary.csv"), getIntensitySummary(roi), false);
 
 		}
 
@@ -236,6 +240,12 @@ public class CsvExporter {
 					+ roiExtension + "_chromatic_shift_summary.csv";
 			TextUtils.writeStringToFile(summaryPath,
 					getChromaticShiftSummary(roi), false);
+			String intensitySummaryPath = path + "channel_1_"
+					+ sanitizeFileName(manager.getBeadImage(0)
+							.getImageNameWithoutExtension())
+					+ roiExtension + "_intensity_summary.csv";
+			TextUtils.writeStringToFile(intensitySummaryPath,
+					getIntensitySummary(roi), false);
 		}
 
 		if (openAfter) {
@@ -444,6 +454,76 @@ public class CsvExporter {
 
 	private static String sanitizeFileName(String name) {
 		return name.replaceAll("[^A-Za-z0-9._-]", "_");
+	}
+
+	/** Returns one illumination-uniformity summary row per loaded channel. */
+	public String getIntensitySummary(Rectangle roi) {
+		FovDataSet summary = new FovDataSet();
+		String[] columns = new String[]{"channel", "image", "wavelength",
+				"valid beads", "intensity mean", "intensity median",
+				"intensity standard deviation", "intensity CV (%)",
+				"intensity minimum", "intensity maximum", "intensity p5",
+				"intensity p25", "intensity p75", "intensity p95",
+				"center mean", "edge mean", "center-to-edge change (%)"};
+		summary.addColumn(columns);
+
+		for (int channel = 0; channel < manager.countBeadImage(); channel++) {
+			BeadImage image = manager.getBeadImage(channel);
+			BeadFrameList beads = image.getBeadFrameList().getFromROI(roi)
+					.getOnlyValidBeads();
+			DescriptiveStatistics intensities = new DescriptiveStatistics();
+			DescriptiveStatistics radii = new DescriptiveStatistics();
+			for (BeadFrame bead : beads) {
+				intensities.addValue(BeadFrameList.getCorrectedIntensity(bead));
+				radii.addValue(bead.getDistanceFromCenter());
+			}
+
+			double innerLimit = radii.getPercentile(33.333);
+			double outerLimit = radii.getPercentile(66.667);
+			DescriptiveStatistics center = new DescriptiveStatistics();
+			DescriptiveStatistics edge = new DescriptiveStatistics();
+			for (BeadFrame bead : beads) {
+				double intensity = BeadFrameList.getCorrectedIntensity(bead);
+				double radius = bead.getDistanceFromCenter();
+				if (radius <= innerLimit)
+					center.addValue(intensity);
+				if (radius >= outerLimit)
+					edge.addValue(intensity);
+			}
+
+			double mean = intensities.getMean();
+			double centerMean = center.getMean();
+			double edgeMean = edge.getMean();
+			summary.addValue(columns[0], channel + 1.0);
+			summary.addValue(columns[1], image.getImageName());
+			summary.addValue(columns[2], image.getMicroscope()
+					.getWaveLengthAsString());
+			summary.addValue(columns[3], (double) beads.size());
+			summary.addValue(columns[4], mean);
+			summary.addValue(columns[5], intensities.getPercentile(50));
+			summary.addValue(columns[6], intensities.getStandardDeviation());
+			summary.addValue(columns[7], mean != 0.0
+					? intensities.getStandardDeviation() / mean * 100.0
+					: Double.NaN);
+			summary.addValue(columns[8], intensities.getMin());
+			summary.addValue(columns[9], intensities.getMax());
+			summary.addValue(columns[10], intensities.getPercentile(5));
+			summary.addValue(columns[11], intensities.getPercentile(25));
+			summary.addValue(columns[12], intensities.getPercentile(75));
+			summary.addValue(columns[13], intensities.getPercentile(95));
+			summary.addValue(columns[14], centerMean);
+			summary.addValue(columns[15], edgeMean);
+			summary.addValue(columns[16], centerMean != 0.0
+					? (edgeMean - centerMean) / centerMean * 100.0
+					: Double.NaN);
+		}
+		return summary.exportToString();
+	}
+
+	private static String getSidecarPath(String path, String suffix) {
+		return path.toLowerCase().endsWith(".csv")
+				? path.substring(0, path.length() - 4) + suffix
+				: path + suffix;
 	}
 
 	/**
