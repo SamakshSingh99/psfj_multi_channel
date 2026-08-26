@@ -4,6 +4,79 @@ Know your microscope fluorescence
 PSFj analyzes a stack of images of fluorescent beads to calculate the resolution of your microscope across the fields of view. PSFj is written in JAVA and compatible with Windows, MacOS X and Linux.
 
 
+## Multichannel extension by Samaksh Singh
+
+The multichannel analysis and reporting extensions described in this section were implemented by **Samaksh Singh**. They expand the original two-channel workflow while retaining the original PSFj resolution analysis and two-channel compatibility.
+
+### Multichannel loading and configuration
+
+- Supports 1 to 12 channels supplied either as separate image stacks or as channels embedded in a multidimensional image.
+- Uses Bio-Formats Z/channel/time indexing when separating embedded channels instead of assuming a fixed two-channel plane order.
+- Provides a multi-channel analysis mode for 2 to 12 loaded channels.
+- Creates an emission-wavelength control for every loaded channel.
+- Refreshes the wavelength controls whenever channels are added, detected in a composite stack, or removed. This avoids the previous issue where only the first two wavelength fields appeared after loading an RGB composite stack.
+- Requires a non-zero wavelength for every channel before multichannel processing is considered ready.
+
+### Chromatic-shift analysis
+
+Channel 1 is the common reference and is compared independently with every other loaded channel. For example, a four-channel dataset produces these comparisons:
+
+```text
+Channel 1 vs Channel 2
+Channel 1 vs Channel 3
+Channel 1 vs Channel 4
+```
+
+Each reference bead can retain a separate matched bead and signed displacement for every target channel. Previously stored matches are cleared before reprocessing so changes to thresholds or filtering do not reuse stale pairings.
+
+The following measurements are calculated for every matched bead pair:
+
+- Delta X: signed horizontal displacement.
+- Delta Y: signed vertical displacement.
+- Delta Z: signed axial displacement.
+- Delta XY: non-negative lateral distance, `sqrt(deltaX^2 + deltaY^2)`.
+- Delta XYZ: non-negative three-dimensional distance, `sqrt(deltaX^2 + deltaY^2 + deltaZ^2)`.
+
+### Interface and exported results
+
+- The heat-map interface contains resolution sections for every channel and a separate chromatic-shift section for every reference-target pair.
+- All five chromatic measurements are shown for each pair with pair-specific titles and matched-bead counts.
+- Heat-map filenames include the reference and target image names so comparisons cannot overwrite one another.
+- The PDF summary contains an independent chromatic-comparison section for every target channel, including all five heat maps and the correct matched-pair count.
+- CSV export produces one measurement file per channel and one comparison file per Channel 1-to-target pair.
+- Every pairwise comparison CSV contains bead IDs, reference and target coordinates, `delta x0`, `delta y0`, `delta z0`, `delta XY`, and `delta XYZ`.
+- A separate chromatic-shift summary CSV contains one row per channel pair. It records channel numbers, image names, wavelengths, matched-pair counts, mean, median, sample standard deviation, minimum, maximum, P5, P25, P75, and P95 for all five shift measurements.
+
+Pairwise files use the following collision-resistant pattern:
+
+```text
+channel_1_<reference>_vs_channel_<N>_<target>_comparison.csv
+```
+
+The combined summary uses:
+
+```text
+channel_1_<reference>_chromatic_shift_summary.csv
+```
+
+Both the original CSV option and the pre-existing machine-parsable "Results CSV (version 2)" option inherit the new multichannel pairwise and summary exports.
+
+### Java compatibility and test data
+
+The project source and NetBeans configuration target Java 8 bytecode. A complete command-line build can be produced with:
+
+```bash
+mkdir -p build/classes
+javac --release 8 -encoding ISO-8859-1 \
+  -cp "lib/*" \
+  -d build/classes \
+  $(find src -name "*.java")
+rsync -a --exclude="*.java" src/ build/classes/
+```
+
+The repository includes `test-data/synthetic_rgb_composite_psf_stack.tif`, a three-channel, 15-plane synthetic RGB stack for exercising composite-channel detection, wavelength controls, and chromatic-shift processing. Its companion `.ini` file contains the test microscope configuration.
+
+
 ## Download and instructions
 Please visit PSFj website [http://www.knoplab.de/psfj/
 ](http://www.knoplab.de/psfj)
