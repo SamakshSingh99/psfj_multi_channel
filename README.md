@@ -4,7 +4,7 @@ Know your microscope fluorescence
 PSFj analyzes a stack of images of fluorescent beads to calculate the resolution of your microscope across the fields of view. PSFj is written in JAVA and compatible with Windows, MacOS X and Linux.
 
 
-## Multichannel extension by Samaksh Singh
+## Multichannel extension by @SamakshSingh99
 
 The multichannel analysis and reporting extensions described in this section were implemented by **Samaksh Singh**. They expand the original two-channel workflow while retaining the original PSFj resolution analysis and two-channel compatibility.
 
