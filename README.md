@@ -74,8 +74,6 @@ javac --release 8 -encoding ISO-8859-1 \
 rsync -a --exclude="*.java" src/ build/classes/
 ```
 
-The repository includes `test-data/synthetic_rgb_composite_psf_stack.tif`, a three-channel, 15-plane synthetic RGB stack for exercising composite-channel detection, wavelength controls, and chromatic-shift processing. Its companion `.ini` file contains the test microscope configuration.
-
 
 ## Download and instructions
 Please visit PSFj website [http://www.knoplab.de/psfj/
